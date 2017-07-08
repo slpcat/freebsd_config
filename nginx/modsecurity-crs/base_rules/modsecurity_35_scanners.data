@@ -1,0 +1,119 @@
+grabber
+cgichk
+bsqlbf
+mozilla/4.0 (compatible)
+sqlmap
+mozilla/4.0 (compatible; msie 6.0; win32)
+mozilla/5.0 sf//
+nessus
+arachni
+metis
+sql power injector
+bilbo
+absinthe
+black widow
+n-stealth
+brutus
+webtrends security analyzer
+netsparker
+python-httplib2
+jaascois
+pmafind
+.nasl
+nsauditor
+paros
+dirbuster
+pangolin
+nmap nse
+sqlninja
+nikto
+webinspect
+blackwidow
+grendel-scan
+havij
+w3af
+winhttp
+hydra
+apachebench
+btwebclient
+flashget
+freshdownload
+jetcar
+pycurl
+wget
+audit
+babykrokodil
+bbbike
+httrack
+httperf
+harvest
+hydra
+netsparker
+nikto
+owasp
+parser
+alligator
+azureus
+backstreet browser
+bw-c-2.0
+charon
+lwp::simple
+apachebench
+getRight
+github
+grabnet
+havij
+jmeter
+joedog
+masscan
+mail2000
+turnitinbot
+webbench
+pyspider
+yyspider
+cpython
+libwww
+libwww-perl
+python-httplib2
+python-requests
+python-urllib
+arachni
+absinthe
+bilbo
+black widow
+blackwidow
+brutus
+bsqlbf
+cgichk
+dirbuster
+fimap
+grabber
+grendel-scan
+havij
+hydra
+jaascois
+jbrofuzz
+libwhisker
+metis
+n-stealth
+netsparker
+nasl
+nmap
+nse
+nsauditor
+nikto
+nessus
+openvas
+pmafind
+paros
+pangolin
+sqlmap|
+sqlninja
+sql power injector
+webinspect
+wifinder
+w3af
+whatweb
+webtrends security analyzer
+webshag
+winhttp

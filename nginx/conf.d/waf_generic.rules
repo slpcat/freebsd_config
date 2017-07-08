@@ -1,0 +1,787 @@
+#过滤文件和路径
+#过滤http请求方法
+#过滤用户代理
+#过滤变量
+#过滤SQL注入
+#过滤XSS跨域
+#过滤referer
+#date:2016-10-26
+#以下所有规则不需要任何第三方模块，当modsecurity模块不存在时取消注释使规则生效，存在modsecurity时，仅启用简单高效无歧义的规则
+#防DOS攻击
+#limit_req zone=req_perip burst=2000 nodelay;
+#limit_req zone=req_perserver burst=18000 nodelay;
+#limit_conn conn_perip 500;
+#limit_conn conn_perserver 8000;
+#limit_rate_after 200m;
+#limit_rate 256k;
+#错误信息伪装
+#error_page 403 404 500 502 503 504 =404 /50x.html;
+#error_page 403 404 500 502 503 504 /50x.html;
+#location = /50x.html {
+#	root /usr/local/www/nginx;
+#}
+
+#favicon.ico不记录日志
+location = /favicon.ico {
+	expires 99d;
+	log_not_found off;
+	access_log off;
+}
+
+#robot.txt不存在不记录日志
+location = /robots.txt {
+	allow all;
+	log_not_found off;
+	access_log on;
+}
+
+#阻止路径或文件
+if ($uri ~* .*(viewsource.jsp)$) { set $rule_id rule_103; return 404; }
+#阻止 /~ 这种路径，通常用于匹配用户起始目录
+if ($uri ~* .*(/~).*) { set $rule_id rule_104; return 444; }
+
+#限制HTTP请求方法 替代modsecurity_crs_30_http_policy id:960032
+#Only allow these request methods Do not accept DELETE, PUT,SEARCH and other methods
+if ($request_method !~ ^(GET|HEAD|POST|OPTIONS)$ ) { set $rule_id rule105; return 444; }
+
+#阻止文件类型（扩展名、后缀）替代modsecurity_crs_30_http_policy id:960035
+location ~* .*\.(bzr|cvs|git|svn)\/ { set $rule_id rule_106; return 403; }
+location ~* \.(bak|backup|bzr|cfg|conf|cvs|doc|docx|DS_Store|ear|git|gitignore|hg|htaccess|htpasswd|ini|inc|jar|log|online|production|project|properties|pl|pm|py|pyc|pyo|sh|sql|svn|swp|war)$ {  
+	set $rule_id rule_107;
+	return 403;  
+}  
+
+#阻止常见windows文件 替代modsecurity_crs_30_http_policy id:960035
+location ~* \.(ade|adp|app|asa|ascx|ashx|asmx|asp|aspx|axd|bas|bat|cdx|cer|chm|class|cmd|com|config|cpl|crt|cs|csproj|csh|csr|dat|dbf|dll|dos|exe|fxp|hlp|hta|htr|htw|ida|idc|idq|ins|isp|its|jse|key|ksh|licx|lnk|mad|maf|mag|mam|maq|mar|mas|mat|mau|mav|maw|mda|mdb|mde|mdt|mdw|mdz|msc|msh|msh1|msh1xml|msh2|msh2xml|mshxml|msi|msp|mst|old|ops|pass|pcd|pdb|pif|pol|prf|prg|printer|pst|pwd|resources|resx|reg|rem|scf|scr|sct|shb|shs|shtm|shtml|soap|stm|sys|url|vb|vbe|vbs|vbproj|vsdisco|webinfo|xsd|xsx|ws|wsc|wsf|wsh)$ {
+	set $rule_id rule_108;
+	return 403;
+}
+
+# User-Agents (Spiders, Robots, Crawler, Browser) http://www.user-agents.org/
+#常见用户代理白名单: curl Baiduspider(百度爬虫) MicroMessenger(微信)
+
+#阻止空用户代理(或无)
+#if ($http_user_agent ~ "^$"){ set $rule_id rule_201; return 444; }
+
+#阻止迅雷下载
+#if ($http_user_agent ~* "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)") {
+#if ($http_user_agent ~* "Mozilla/5.0 (compatible; MSIE 6.0; Windows NT 5.0)") {
+#if ($http_user_agent ~* "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0; .NET CLR 3.5.20706)") {
+#if ($http_user_agent ~* "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 1.1.4322; .NET CLR 2.0.50727i)") {
+#"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.2; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729)
+#return 404;
+#}
+
+#阻止下载程序
+if ($http_user_agent ~* "BTWebClient|FlashGet|FreshDownload|JetCar|PycURL|wget") {
+	set $rule_id rule_204;
+        return 444;
+}
+if ($http_user_agent ~* "audit|BabyKrokodil|BBBike|httrack|httperf|harvest|hydra|netsparker|Nikto|owasp|parser") {
+	set $rule_id rule_205;
+        return 444;
+}
+
+if ($http_user_agent ~* "Alligator|Azureus|BackStreet Browser|BW-C-2.0|Charon|LWP::Simple") {
+	set $rule_id rule_206;
+        return 444;
+}
+
+#阻止测试工具
+if ($http_user_agent ~* ApacheBench|GetRight|github|GrabNet|Havij|Jmeter|JoeDog|masscan|mail2000|TurnitinBot|WebBench) {
+	set $rule_id rule_207;
+        return 444;
+}
+
+#阻止来自中国机器人、爬虫
+#百度搜索机器人
+#if ($http_user_agent ~* "baiduspider|Baiduspider-mobile|Baiduspider-image|Baiduspider-video|Baiduspider-news|Baiduspider-favo|Baiduspider-cpro|Baiduspider-sfkr|Baiduspider-mobile-gate|Baidu-Transcoder|BaiduCustomer|Baidu-Thumbnail") {
+#	set $rule_id rule_231;
+#        return 444;
+#}
+
+#腾讯搜搜机器人
+if ($http_user_agent ~* "Sosospider|Sosoimagespider") {
+	set $rule_id rule_232;
+	return 444;
+}
+
+#网易有道机器人
+if ($http_user_agent ~* "YodaoBot|YoudaoBot") {
+	set $rule_id rule_233;
+	return 444;
+}
+
+#搜狗机器人
+if ($http_user_agent ~* "Sogou Pic Spider|Sogou web spider") {
+	set $rule_id rule_234;
+	return 444;
+}
+
+#360搜索机器人
+if ($http_user_agent ~* "360Spider|HaosouSpider") {
+	set $rule_id rule_235;
+	return 444;
+}
+
+#阿里一淘机器人
+if ($http_user_agent ~* "EtaoSpider") {
+	set $rule_id rule_236;
+	return 444;
+}
+if ($http_user_agent ~* "EasouSpider|HuaweiSymantecSpider|JikeSpider|pyspider|YisouSpider|YYSpider") {
+	set $rule_id rule_237;
+	return 444;
+}
+
+#web监控机器人
+#if ($http_user_agent ~* "360JK|DNSPod-Monitor|JianKongBao Monitor") {
+#	set $rule_id rule_241;
+#	return 444;
+#}
+
+#web安全扫描机器人
+#if ($http_user_agent ~* "Baidu-YunGuanCe-SLABot|") {
+#	set $rule_id rule_242;
+#	return 444;
+#}
+
+#阻止扫描器
+if ($http_user_agent ~* "CPython|libwww|libwww-perl|python-httplib2|python-requests|Python-urllib") {
+	set $rule_id rule_209;
+        return 444;
+}
+
+if ($http_user_agent ~* "arachni|absinthe|bilbo|black widow|blackwidow|brutus|bsqlbf|cgichk|dirbuster|fimap|grabber|grendel-scan|havij|hydra|jaascois|jbrofuzz|libwhisker|metis|n-stealth|netsparker|nasl|nmap|nse|nsauditor|nikto|nessus|Openvas|pmafind|paros|pangolin|sqlmap|sqlninja|sql power injector|webinspect|wifinder|w3af|whatweb|webtrends security analyzer|webshag|WinHttp") {
+	set $rule_id rule_210;
+        return 444;
+}
+
+#阻止来自外国机器人、爬虫
+#Yahoo! robot
+if ($http_user_agent ~* "Slurp|Yahoo! Slurp|Yahoo! Slurp China") {
+	set $rule_id rule_211;
+        return 444;
+}
+
+#Microsoft robot
+if ($http_user_agent ~* "bingbot|msnbot") {
+	set $rule_id rule_212;
+        return 444;
+}
+
+#Google robot
+if ($http_user_agent ~* "annotate_google|AdsBot-Google|Feedfetcher-Google|Googlebot|Googlebot-Mobile|Google Talk|Google WAP Proxy|Google CHTML Proxy|Googlebot-Image|Mediapartners-Google|AdsBot-Google-Mobile") {
+	set $rule_id rule_213;
+        return 444;
+}
+
+if ($http_user_agent ~* "AhrefsBot|AltaVista|aiHitBot|BBScan|BLEXBot|CSS Certificate Spider|COMODO SSL Checker|Dataprovider|electricmonk|eMusic|Exabot|FeedBurner|Feedsky crawler|ia_archiver|ips-agent|netcraft|NgSpider|panscient.com|Plukkie|SemrushBot|SeznamBot|spiderman|seoscanners.net|SafeDNSBot|scrapbot|SurveyBot|semanticbot|SiteExplorer|Scrapy|Uptimebot|Wotbox|YRSpider") {
+	set $rule_id rule_214;
+	return 444;
+}
+
+if ($http_user_agent ~* "archive.org_bot|AskTbFXTV|AhrefsBot|Alexa Toolbar|CrawlDaddy|CoolpadWebkit|DigExt|Ezooms|FeedDemon|Feedly|FlightDeckReports Bot|HttpClient|heritrix|Indy Library|Java|jaunty|Jullo|Linguee Bot|lightDeckReports Bot|LinkpadBot|Microsoft URL Control|MJ12bot|My Nutch Spider|nutch|oBot|PagesInventory|special_archiver|Swiftbot|UniversalFeedParser|YandexBot|ZmEu") {  
+	set $rule_id rule_215;
+	return 444;  
+}
+
+#
+#变量类型和长度规则
+#腾讯openid
+#openid ^([0-9A-F]{32})$
+
+#阻止请求中出现空格(转码后无影响）双横杠 %00截断
+#if ($request_uri ~ "(\ |--|%00)") { set $rule_id rule_501; return 444; }
+
+#阻止参数含有的字符 ; ' < >  正规浏览器会转码，其他字符(* #)
+#if ($args ~ "[;'<>]") { set $rule_id rule_502; return 444; }
+
+#阻止 /* 注释 */
+#if ($request_uri ~* "(\/\*).*(\*\/)") { set $rule_id rule_503; return 444; }
+
+#阻止 (数字=数字字符)
+#if ($args ~ "(%28|\()\d+=\d+.*(%29|\))") { set $rule_id rule_504; return 444; }
+
+#阻止参数中的SQL命令
+#if ($request_uri ~* "[+|(%20)|(%09)]union[+|(%20)|(%09)]") { set $rule_id rule_510; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]and[+|(%20)|(%09)]") { set $rule_id rule_511; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]select[+|(%20)|(%09)]") { set $rule_id rule_512; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]or[+|(%20)|(%09)]") { set $rule_id rule_513; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]from[+|(%20)|(%09)]") { set $rule_id rule_514; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]delete[+|(%20)|(%09)]") { set $rule_id rule_515; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]update[+|(%20)|(%09)]") { set $rule_id rule_516; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]insert[+|(%20)|(%09)]") { set $rule_id rule_517; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]declare[+|(%20)|(%09)]") { set $rule_id rule_518; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]exec[+|(%20)|(%09)]") { set $rule_id rule_519; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]drop[+|(%20)|(%09)]") { set $rule_id rule_520; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]alter[+|(%20)|(%09)]") { set $rule_id rule_521; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]truncate[+|(%20)|(%09)]") { set $rule_id rule_522; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]grant[+|(%20)|(%09)]") { set $rule_id rule_523; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]where[+|(%20)|(%09)]") { set $rule_id rule_524; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]like[+|(%20)|(%09)]") { set $rule_id rule_525; return 444; }
+#if ($request_uri ~* "[+|(%20)|(%09)]master[+|(%20)|(%09)]") { set $rule_id rule_526; return 444; }
+
+#阻止跨域脚本
+#if ($args ~* "(<|%3C).*script.*(>|%3E)") { set $rule_id rule_601; return 444; }
+#if ($args ~* "(<|%3C).*iframe.*(>|%3E)") { set $rule_id rule_602; return 444; }
+
+#参数中禁止出现GLOBALS= GLOBALS[ GLOBALS% 
+#if ($args ~ "GLOBALS(=|\[|\%[0-9A-Z]{0,2})") { set $rule_id rule_603; return 444; }
+
+#参数中禁止出现_REQUEST= _REQUEST[ _REQUEST%
+#if ($args ~ "_REQUEST(=|\[|\%[0-9A-Z]{0,2})") { set $rule_id rule_604; return 444; }
+
+#阻止路径proc/self/environ获取环境变量
+#if ($args ~* "proc[/|(%2f)|(%5c)]self[/|(%2f)|(%5c)]environ") { set $rule_id rule_605; return 444; }
+#if ($args ~* "boot.ini") { set $rule_id rule_606; return 444; }
+#if ($args ~* "win.ini") { set $rule_id rule_607; return 444; }
+#if ($args ~* "rc.local") { set $rule_id rule_608; return 444; }
+#if ($args ~* "etc[/|(%2f)|(%5c)]+passwd") { set $rule_id rule_609; return 444; }
+#if ($args ~ "mosConfig_[a-zA-Z_]{1,21}(=|\%3D)") { set $rule_id rule_610; return 444; }
+
+#阻止函数作为参数 
+#https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet
+#参数禁止出现base64_encode()和base64_decode()函数
+#if ($request_uri ~* "base64_(en|de)code(\(|%28).*(\)|%29)") { set $rule_id rule_621; return 444; }
+#if ($request_uri ~* "alert(\(|%28).*(\)|%29)") { set $rule_id rule_622; return 444; }
+#if ($request_uri ~* "prompt(\(|%28).*(\)|%29)") { set $rule_id rule_623; return 444; }
+#if ($request_uri ~* "confirm(\(|%28).*(\)|%29)") { set $rule_id rule_624; return 444; }
+#if ($request_uri ~* "fromCharCode(\(|%28).*(\)|%29)") { set $rule_id rule_625; return 444; }
+#if ($request_uri ~* "header(\(|%28).*(\)|%29)") { set $rule_id rule_626; return 444; }
+#if ($request_uri ~* "setcookie(\(|%28).*(\)|%29)") { set $rule_id rule_627; return 444; }
+#if ($request_uri ~* "print(\(|%28).*(\)|%29)") { set $rule_id rule_628; return 444; }
+#if ($request_uri ~* "println(\(|%28).*(\)|%29)") { set $rule_id rule_629; return 444; }
+#if ($request_uri ~* "md5(\(|%28).*(\)|%29)") { set $rule_id rule_630; return 444; }
+#if ($request_uri ~* "char(\(|%28).*(\)|%29)") { set $rule_id rule_631; return 444; }
+#if ($request_uri ~* "response.write(\(|%28).*(\)|%29)") { set $rule_id rule_632; return 444; }
+#if ($request_uri ~* "count(\(|%28).*(\)|%29)") { set $rule_id rule_633; return 444; }
+#if ($request_uri ~* "concat(\(|%28).*(\)|%29)") { set $rule_id rule_634; return 444; }
+#if ($request_uri ~* "convert(\(|%28).*(\)|%29)") { set $rule_id rule_635; return 444; }
+#if ($request_uri ~* "cost(\(|%28).*(\)|%29)") { set $rule_id rule_636; return 444; }
+#if ($request_uri ~* "iif(\(|%28).*(\)|%29)") { set $rule_id rule_637; return 444; }
+#if ($request_uri ~* "extractValue(\(|%28).*(\)|%29)") { set $rule_id rule_638; return 444; }
+#if ($request_uri ~* "mid(\(|%28).*(\)|%29)") { set $rule_id rule_639; return 444; }
+#if ($request_uri ~* "msgbox(\(|%28).*(\)|%29)") { set $rule_id rule_640; return 444; }
+#if ($request_uri ~* "document.write(\(|%28).*(\)|%29)") { set $rule_id rule_641; return 444; }
+#if ($request_uri ~* "document.writeln(\(|%28).*(\)|%29)") { set $rule_id rule_642; return 444; }
+#if ($request_uri ~* "encodeURL(\(|%28).*(\)|%29)") { set $rule_id rule_643; return 444; }
+#if ($request_uri ~* "eval(\(|%28).*(\)|%29)") { set $rule_id rule_644; return 444; }
+#if ($request_uri ~* "setTimeout(\(|%28).*(\)|%29)") { set $rule_id rule_645; return 444; }
+#if ($request_uri ~* "setInterval(\(|%28).*(\)|%29)") { set $rule_id rule_646; return 444; }
+#if ($request_uri ~* "window.execScript(\(|%28).*(\)|%29)") { set $rule_id rule_647; return 444; }
+#if ($request_uri ~* "window.setInterval(\(|%28).*(\)|%29)") { set $rule_id rule_648; return 444; }
+#if ($request_uri ~* "window.setTimeout(\(|%28).*(\)|%29)") { set $rule_id rule_649; return 444; }
+#if ($request_uri ~* "cmd(\(|%28).*(\)|%29)") { set $rule_id rule_650; return 444; }
+#if ($request_uri ~* "database(\(|%28).*(\)|%29)") { set $rule_id rule_651; return 444; }
+#if ($request_uri ~* "version(\(|%28).*(\)|%29)") { set $rule_id rule_652; return 444; }
+#if ($request_uri ~* "substring(\(|%28).*(\)|%29)") { set $rule_id rule_653; return 444; }
+#if ($request_uri ~* "substr(\(|%28).*(\)|%29)") { set $rule_id rule_654; return 444; }
+#if ($request_uri ~* "ascii(\(|%28).*(\)|%29)") { set $rule_id rule_655; return 444; }
+#if ($request_uri ~* "hex(\(|%28).*(\)|%29)") { set $rule_id rule_656; return 444; }
+#if ($request_uri ~* "bin(\(|%28).*(\)|%29)") { set $rule_id rule_657; return 444; }
+#if ($request_uri ~* "Benchmark(\(|%28).*(\)|%29)") { set $rule_id rule_658; return 444; }
+#if ($request_uri ~* "sleep(\(|%28).*(\)|%29)") { set $rule_id rule_659; return 444; }
+#if ($request_uri ~* "strcmp(\(|%28).*(\)|%29)") { set $rule_id rule_660; return 444; }
+#if ($request_uri ~* "left(\(|%28).*(\)|%29)") { set $rule_id rule_661; return 444; }
+#if ($request_uri ~* "concat_ws(\(|%28).*(\)|%29)") { set $rule_id rule_662; return 444; }
+#if ($request_uri ~* "group_concat(\(|%28).*(\)|%29)") { set $rule_id rule_663; return 444; }
+
+#阻止user agent中的sql语句/函数
+
+if ($http_user_agent ~* "sleep(\(|%28).*(\)|%29)") { set $rule_id rule_680; return 444; }
+if ($http_user_agent ~* "select(\(|%28).*(\)|%29)") { set $rule_id rule_681; return 444; }
+if ($http_user_agent ~* "from(\(|%28).*(\)|%29)") { set $rule_id rule_682; return 444; }
+if ($http_user_agent ~* "substring(\(|%28).*(\)|%29)") { set $rule_id rule_683; return 444; }
+if ($http_user_agent ~* "count(\(|%28).*(\)|%29)") { set $rule_id rule_684; return 444; }
+if ($http_user_agent ~* "concat(\(|%28).*(\)|%29)") { set $rule_id rule_685; return 444; }
+if ($http_user_agent ~* "floor(\(|%28).*(\)|%29)") { set $rule_id rule_686; return 444; }
+if ($http_user_agent ~* "Rand(\(|%28).*(\)|%29)") { set $rule_id rule_687; return 444; }
+if ($http_user_agent ~* "md5(\(|%28).*(\)|%29)") { set $rule_id rule_688; return 444; }
+if ($http_user_agent ~* "char(\(|%28).*(\)|%29)") { set $rule_id rule_689; return 444; }
+if ($http_user_agent ~* "substr(\(|%28).*(\)|%29)") { set $rule_id rule_690; return 444; }
+if ($http_user_agent ~* "hex(\(|%28).*(\)|%29)") { set $rule_id rule_691; return 444; }
+if ($http_user_agent ~* "bin(\(|%28).*(\)|%29)") { set $rule_id rule_692; return 444; }
+if ($http_user_agent ~* "database(\(|%28).*(\)|%29)") { set $rule_id rule_693; return 444; }
+if ($http_user_agent ~* "cost(\(|%28).*(\)|%29)") { set $rule_id rule_694; return 444; }
+if ($http_user_agent ~* "eval(\(|%28).*(\)|%29)") { set $rule_id rule_695; return 444; }
+if ($http_user_agent ~* "ascii(\(|%28).*(\)|%29)") { set $rule_id rule_696; return 444; }
+
+#阻止shell命令作为参数
+
+#禁止跨站脚本/代码引用
+#if ($args ~ "[a-zA-Z0-9_]=http://") { set $rule_id rule_670; return 444; }
+#if ($args ~ "[a-zA-Z0-9_]=https://") { set $rule_id rule_671; return 444; }
+#if ($args ~ "[a-zA-Z0-9_]=(\.\.//?)+") { set $rule_id rule_672; return 444; }
+#if ($args ~ "[a-zA-Z0-9_]=/([a-z0-9_.]//?)+") { set $rule_id rule_673; return 444; }
+
+##织梦漏洞 _POST[GLOBALS][cfg_dbname]=1
+## Block Cookie Injection
+#$http_cookie
+## Block X-Forwarded-For Injection
+#$proxy_add_x_forwarded_for
+## Block User-agent Injection
+#$http_user_agent
+## Block Referer Injection
+#$http_referer
+
+#阻止非http协议开头的referer,允许空referer(或无)
+if ( $http_referer !~* (^http://|^https://|^$) ) { set $rule_id rule_251; return 444; }
+
+#阻止垃圾机器人（Referer Spam Bots） (also known as log spam or referrer bombing) 
+#if ( $http_referer ~* (babes|forsale|girl|jewelry|love|nudit|organic|poker|porn|sex|teen) ) { 
+#	set $rule_id rule_252;
+#	return 444;
+#}
+
+##阻止垃圾站点（referer spam）
+##https://github.com/piwik/referrer-spam-blacklist/blob/master/spammers.txt
+if ($http_referer ~ '0n-line\.tv') {return 444;}
+if ($http_referer ~ '100dollars-seo\.com') {return 444;}
+if ($http_referer ~ '12masterov\.com') {return 444;}
+if ($http_referer ~ '1-99seo\.com') {return 444;}
+if ($http_referer ~ '1-free-share-buttons\.com') {return 444;}
+if ($http_referer ~ '1pamm\.ru') {return 444;}
+if ($http_referer ~ '1webmaster\.ml') {return 444;}
+if ($http_referer ~ '2your\.site') {return 444;}
+if ($http_referer ~ '4webmasters\.org') {return 444;}
+if ($http_referer ~ '5forex\.ru') {return 444;}
+if ($http_referer ~ '6hopping\.com') {return 444;}
+if ($http_referer ~ '7makemoneyonline\.com') {return 444;}
+if ($http_referer ~ '7zap\.com') {return 444;}
+if ($http_referer ~ 'acads\.net') {return 444;}
+if ($http_referer ~ 'acunetix-referrer\.com') {return 444;}
+if ($http_referer ~ 'adcash\.com') {return 444;}
+if ($http_referer ~ 'adf\.ly') {return 444;}
+if ($http_referer ~ 'adspart\.com') {return 444;}
+if ($http_referer ~ 'adtiger\.tk') {return 444;}
+if ($http_referer ~ 'adventureparkcostarica\.com') {return 444;}
+if ($http_referer ~ 'adviceforum\.info') {return 444;}
+if ($http_referer ~ 'affordablewebsitesandmobileapps\.com') {return 444;}
+if ($http_referer ~ 'afora\.ru') {return 444;}
+if ($http_referer ~ 'akuhni\.by') {return 444;}
+if ($http_referer ~ 'alibestsale\.com') {return 444;}
+if ($http_referer ~ 'allknow\.info') {return 444;}
+if ($http_referer ~ 'allnews\.md') {return 444;}
+if ($http_referer ~ 'allwomen\.info') {return 444;}
+if ($http_referer ~ 'alpharma\.net') {return 444;}
+if ($http_referer ~ 'altermix\.ua') {return 444;}
+if ($http_referer ~ 'amt-k\.ru') {return 444;}
+if ($http_referer ~ 'anal-acrobats\.hol\.es') {return 444;}
+if ($http_referer ~ 'anapa-inns\.ru') {return 444;}
+if ($http_referer ~ 'android-style\.com') {return 444;}
+if ($http_referer ~ 'anticrawler\.org') {return 444;}
+if ($http_referer ~ 'arendakvartir\.kz') {return 444;}
+if ($http_referer ~ 'arkkivoltti\.net') {return 444;}
+if ($http_referer ~ 'artparquet\.ru') {return 444;}
+if ($http_referer ~ 'aruplighting\.com') {return 444;}
+if ($http_referer ~ 'autovideobroadcast\.com') {return 444;}
+if ($http_referer ~ 'aviva-limoux\.com') {return 444;}
+if ($http_referer ~ 'azartclub\.org') {return 444;}
+if ($http_referer ~ 'azlex\.uz') {return 444;}
+if ($http_referer ~ 'baixar-musicas-gratis\.com') {return 444;}
+if ($http_referer ~ 'baladur\.ru') {return 444;}
+if ($http_referer ~ 'balitouroffice\.com') {return 444;}
+if ($http_referer ~ 'bard-real\.com\.ua') {return 444;}
+if ($http_referer ~ 'bestmobilityscooterstoday\.com') {return 444;}
+if ($http_referer ~ 'best-seo-offer\.com') {return 444;}
+if ($http_referer ~ 'best-seo-software\.xyz') {return 444;}
+if ($http_referer ~ 'best-seo-solution\.com') {return 444;}
+if ($http_referer ~ 'bestwebsitesawards\.com') {return 444;}
+if ($http_referer ~ 'bif-ru\.info') {return 444;}
+if ($http_referer ~ 'biglistofwebsites\.com') {return 444;}
+if ($http_referer ~ 'billiard-classic\.com\.ua') {return 444;}
+if ($http_referer ~ 'bizru\.info') {return 444;}
+if ($http_referer ~ 'black-friday\.ga') {return 444;}
+if ($http_referer ~ 'blackhatworth\.com') {return 444;}
+if ($http_referer ~ 'blogtotal\.de') {return 444;}
+if ($http_referer ~ 'bluerobot\.info') {return 444;}
+if ($http_referer ~ 'blue-square\.biz') {return 444;}
+if ($http_referer ~ 'boostmyppc\.com') {return 444;}
+if ($http_referer ~ 'brakehawk\.com') {return 444;}
+if ($http_referer ~ 'break-the-chains\.com') {return 444;}
+if ($http_referer ~ 'brk-rti\.ru') {return 444;}
+if ($http_referer ~ 'brothers-smaller\.ru') {return 444;}
+if ($http_referer ~ 'budmavtomatika\.com\.ua') {return 444;}
+if ($http_referer ~ 'burger-imperia\.com') {return 444;}
+if ($http_referer ~ 'burn-fat\.ga') {return 444;}
+if ($http_referer ~ 'buttons-for-website\.com') {return 444;}
+if ($http_referer ~ 'buttons-for-your-website\.com') {return 444;}
+if ($http_referer ~ 'buy-cheap-online\.info') {return 444;}
+if ($http_referer ~ 'buy-cheap-pills-order-online\.com') {return 444;}
+if ($http_referer ~ 'buy-forum\.ru') {return 444;}
+if ($http_referer ~ 'call-of-duty\.info') {return 444;}
+if ($http_referer ~ 'cardiosport\.com\.ua') {return 444;}
+if ($http_referer ~ 'cartechnic\.ru') {return 444;}
+if ($http_referer ~ 'cenokos\.ru') {return 444;}
+if ($http_referer ~ 'cenoval\.ru') {return 444;}
+if ($http_referer ~ 'cezartabac\.ro') {return 444;}
+if ($http_referer ~ 'chcu\.net') {return 444;}
+if ($http_referer ~ 'chinese-amezon\.com') {return 444;}
+if ($http_referer ~ 'cityadspix\.com') {return 444;}
+if ($http_referer ~ 'ci\.ua') {return 444;}
+if ($http_referer ~ 'civilwartheater\.com') {return 444;}
+if ($http_referer ~ 'clicksor\.com') {return 444;}
+if ($http_referer ~ 'coderstate\.com') {return 444;}
+if ($http_referer ~ 'codysbbq\.com') {return 444;}
+if ($http_referer ~ 'compliance-john\.top') {return 444;}
+if ($http_referer ~ 'conciergegroup\.org') {return 444;}
+if ($http_referer ~ 'connectikastudio\.com') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-aa\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-bb\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-cc\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-dd\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-ee\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-ff\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-gg\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-hh\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-ii\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-jj\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-kk\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-ll\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-mm\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-nn\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-oo\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-pp\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-qq\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-rr\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-ss\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-tt\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-uu\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-vv\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-ww\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-xx\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-yy\.xyz') {return 444;}
+if ($http_referer ~ 'cookie-law-enforcement-zz\.xyz') {return 444;}
+if ($http_referer ~ 'copyrightclaims\.org') {return 444;}
+if ($http_referer ~ 'covadhosting\.biz') {return 444;}
+if ($http_referer ~ 'cubook\.supernew\.org') {return 444;}
+if ($http_referer ~ 'customsua\.com\.ua') {return 444;}
+if ($http_referer ~ 'cyber-monday\.ga') {return 444;}
+if ($http_referer ~ 'dailyrank\.net') {return 444;}
+if ($http_referer ~ 'darodar\.com') {return 444;}
+if ($http_referer ~ 'dbutton\.net') {return 444;}
+if ($http_referer ~ 'delfin-aqua\.com\.ua') {return 444;}
+if ($http_referer ~ 'demenageur\.com') {return 444;}
+if ($http_referer ~ 'descargar-musica-gratis\.net') {return 444;}
+if ($http_referer ~ 'detskie-konstruktory\.ru') {return 444;}
+if ($http_referer ~ 'dipstar\.org') {return 444;}
+if ($http_referer ~ 'djekxa\.ru') {return 444;}
+if ($http_referer ~ 'djonwatch\.ru') {return 444;}
+if ($http_referer ~ 'dktr\.ru') {return 444;}
+if ($http_referer ~ 'dogsrun\.net') {return 444;}
+if ($http_referer ~ 'dojki-hd\.com') {return 444;}
+if ($http_referer ~ 'domain-tracker\.com') {return 444;}
+if ($http_referer ~ 'dominateforex\.ml') {return 444;}
+if ($http_referer ~ 'domination\.ml') {return 444;}
+if ($http_referer ~ 'doska-vsem\.ru') {return 444;}
+if ($http_referer ~ 'dostavka-v-krym\.com') {return 444;}
+if ($http_referer ~ 'drupa\.com') {return 444;}
+if ($http_referer ~ 'dvr\.biz\.ua') {return 444;}
+if ($http_referer ~ 'easycommerce\.cf') {return 444;}
+if ($http_referer ~ 'e-buyeasy\.com') {return 444;}
+if ($http_referer ~ 'ecomp3\.ru') {return 444;}
+if ($http_referer ~ 'econom\.co') {return 444;}
+if ($http_referer ~ 'edakgfvwql\.ru') {return 444;}
+if ($http_referer ~ 'egovaleo\.it') {return 444;}
+if ($http_referer ~ 'ekatalog\.xyz') {return 444;}
+if ($http_referer ~ 'ekto\.ee') {return 444;}
+if ($http_referer ~ 'e-kwiaciarz\.pl') {return 444;}
+if ($http_referer ~ 'elmifarhangi\.com') {return 444;}
+if ($http_referer ~ 'erot\.co') {return 444;}
+if ($http_referer ~ 'escort-russian\.com') {return 444;}
+if ($http_referer ~ 'este-line\.com\.ua') {return 444;}
+if ($http_referer ~ 'eu-cookie-law-enforcement2\.xyz') {return 444;}
+if ($http_referer ~ 'euromasterclass\.ru') {return 444;}
+if ($http_referer ~ 'europages\.com\.ru') {return 444;}
+if ($http_referer ~ 'eurosamodelki\.ru') {return 444;}
+if ($http_referer ~ 'event-tracking\.com') {return 444;}
+if ($http_referer ~ 'eyes-on-you\.ga') {return 444;}
+if ($http_referer ~ 'fast-wordpress-start\.com') {return 444;}
+if ($http_referer ~ 'fbdownloader\.com') {return 444;}
+if ($http_referer ~ 'fix-website-errors\.com') {return 444;}
+if ($http_referer ~ 'floating-share-buttons\.com') {return 444;}
+if ($http_referer ~ 'forex-procto\.ru') {return 444;}
+if ($http_referer ~ 'forsex\.info') {return 444;}
+if ($http_referer ~ 'forum69\.info') {return 444;}
+if ($http_referer ~ 'for-your\.website') {return 444;}
+if ($http_referer ~ 'free-floating-buttons\.com') {return 444;}
+if ($http_referer ~ 'freenode\.info') {return 444;}
+if ($http_referer ~ 'free-share-buttons\.com') {return 444;}
+if ($http_referer ~ 'free-social-buttons7\.xyz') {return 444;}
+if ($http_referer ~ 'free-social-buttons\.com') {return 444;}
+if ($http_referer ~ 'free-social-buttons\.xyz') {return 444;}
+if ($http_referer ~ 'free-traffic\.xyz') {return 444;}
+if ($http_referer ~ 'free-video-tool\.com') {return 444;}
+if ($http_referer ~ 'freewhatsappload\.com') {return 444;}
+if ($http_referer ~ 'fsalas\.com') {return 444;}
+if ($http_referer ~ 'generalporn\.org') {return 444;}
+if ($http_referer ~ 'germes-trans\.com') {return 444;}
+if ($http_referer ~ 'get-free-social-traffic\.com') {return 444;}
+if ($http_referer ~ 'get-free-traffic-now\.com') {return 444;}
+if ($http_referer ~ 'getlamborghini\.ga') {return 444;}
+if ($http_referer ~ 'getrichquickly\.info') {return 444;}
+if ($http_referer ~ 'getrichquick\.ml') {return 444;}
+if ($http_referer ~ 'get-your-social-buttons\.info') {return 444;}
+if ($http_referer ~ 'ghazel\.ru') {return 444;}
+if ($http_referer ~ 'ghostvisitor\.com') {return 444;}
+if ($http_referer ~ 'girlporn\.ru') {return 444;}
+if ($http_referer ~ 'gkvector\.ru') {return 444;}
+if ($http_referer ~ 'glavprofit\.ru') {return 444;}
+if ($http_referer ~ 'gobongo\.info') {return 444;}
+if ($http_referer ~ 'goodprotein\.ru') {return 444;}
+if ($http_referer ~ 'googlemare\.com') {return 444;}
+if ($http_referer ~ 'googlsucks\.com') {return 444;}
+if ($http_referer ~ 'guardlink\.org') {return 444;}
+if ($http_referer ~ 'handicapvantoday\.com') {return 444;}
+if ($http_referer ~ 'havepussy\.com') {return 444;}
+if ($http_referer ~ 'hdmoviecamera\.net') {return 444;}
+if ($http_referer ~ 'hdmoviecams\.com') {return 444;}
+if ($http_referer ~ 'hongfanji\.com') {return 444;}
+if ($http_referer ~ 'hosting-tracker\.com') {return 444;}
+if ($http_referer ~ 'howopen\.ru') {return 444;}
+if ($http_referer ~ 'howtostopreferralspam\.eu') {return 444;}
+if ($http_referer ~ 'hulfingtonpost\.com') {return 444;}
+if ($http_referer ~ 'humanorightswatch\.org') {return 444;}
+if ($http_referer ~ 'hundejo\.com') {return 444;}
+if ($http_referer ~ 'hvd-store\.com') {return 444;}
+if ($http_referer ~ 'ico\.re') {return 444;}
+if ($http_referer ~ 'igadgetsworld\.com') {return 444;}
+if ($http_referer ~ 'igru-xbox\.net') {return 444;}
+if ($http_referer ~ 'ilikevitaly\.com') {return 444;}
+if ($http_referer ~ 'iloveitaly\.ro') {return 444;}
+if ($http_referer ~ 'iloveitaly\.ru') {return 444;}
+if ($http_referer ~ 'ilovevitaly\.co') {return 444;}
+if ($http_referer ~ 'ilovevitaly\.com') {return 444;}
+if ($http_referer ~ 'ilovevitaly\.info') {return 444;}
+if ($http_referer ~ 'ilovevitaly\.org') {return 444;}
+if ($http_referer ~ 'ilovevitaly\.ru') {return 444;}
+if ($http_referer ~ 'ilovevitaly\.xyz') {return 444;}
+if ($http_referer ~ 'iminent\.com') {return 444;}
+if ($http_referer ~ 'imperiafilm\.ru') {return 444;}
+if ($http_referer ~ 'increasewwwtraffic\.info') {return 444;}
+if ($http_referer ~ 'investpamm\.ru') {return 444;}
+if ($http_referer ~ 'iskalko\.ru') {return 444;}
+if ($http_referer ~ 'ispaniya-costa-blanca\.ru') {return 444;}
+if ($http_referer ~ 'it-max\.com\.ua') {return 444;}
+if ($http_referer ~ 'jjbabskoe\.ru') {return 444;}
+if ($http_referer ~ 'justprofit\.xyz') {return 444;}
+if ($http_referer ~ 'kabbalah-red-bracelets\.com') {return 444;}
+if ($http_referer ~ 'kambasoft\.com') {return 444;}
+if ($http_referer ~ 'kazrent\.com') {return 444;}
+if ($http_referer ~ 'keywords-monitoring-success\.com') {return 444;}
+if ($http_referer ~ 'keywords-monitoring-your-success\.com') {return 444;}
+if ($http_referer ~ 'kino-fun\.ru') {return 444;}
+if ($http_referer ~ 'kino-key\.info') {return 444;}
+if ($http_referer ~ 'kinopolet\.net') {return 444;}
+if ($http_referer ~ 'knigonosha\.net') {return 444;}
+if ($http_referer ~ 'konkursov\.net') {return 444;}
+if ($http_referer ~ 'law-check-two\.xyz') {return 444;}
+if ($http_referer ~ 'law-enforcement-bot-ff\.xyz') {return 444;}
+if ($http_referer ~ 'law-enforcement-check-three\.xyz') {return 444;}
+if ($http_referer ~ 'law-enforcement-ee\.xyz') {return 444;}
+if ($http_referer ~ 'law-six\.xyz') {return 444;}
+if ($http_referer ~ 'laxdrills\.com') {return 444;}
+if ($http_referer ~ 'legalrc\.biz') {return 444;}
+if ($http_referer ~ 'littleberry\.ru') {return 444;}
+if ($http_referer ~ 'livefixer\.com') {return 444;}
+if ($http_referer ~ 'lsex\.xyz') {return 444;}
+if ($http_referer ~ 'lumb\.co') {return 444;}
+if ($http_referer ~ 'luxup\.ru') {return 444;}
+if ($http_referer ~ 'magicdiet\.gq') {return 444;}
+if ($http_referer ~ 'makemoneyonline\.com') {return 444;}
+if ($http_referer ~ 'makeprogress\.ga') {return 444;}
+if ($http_referer ~ 'manualterap\.roleforum\.ru') {return 444;}
+if ($http_referer ~ 'maridan\.com\.ua') {return 444;}
+if ($http_referer ~ 'marketland\.ml') {return 444;}
+if ($http_referer ~ 'masterseek\.com') {return 444;}
+if ($http_referer ~ 'mebelcomplekt\.ru') {return 444;}
+if ($http_referer ~ 'mebeldekor\.com\.ua') {return 444;}
+if ($http_referer ~ 'meds-online24\.com') {return 444;}
+if ($http_referer ~ 'med-zdorovie\.com\.ua') {return 444;}
+if ($http_referer ~ 'minegam\.com') {return 444;}
+if ($http_referer ~ 'mirobuvi\.com\.ua') {return 444;}
+if ($http_referer ~ 'mirtorrent\.net') {return 444;}
+if ($http_referer ~ 'mobilemedia\.md') {return 444;}
+if ($http_referer ~ 'monetizationking\.net') {return 444;}
+if ($http_referer ~ 'moneytop\.ru') {return 444;}
+if ($http_referer ~ 'mosrif\.ru') {return 444;}
+if ($http_referer ~ 'moyakuhnia\.ru') {return 444;}
+if ($http_referer ~ 'muscle-factory\.com\.ua') {return 444;}
+if ($http_referer ~ 'myftpupload\.com') {return 444;}
+if ($http_referer ~ 'myplaycity\.com') {return 444;}
+if ($http_referer ~ 'net-profits\.xyz') {return 444;}
+if ($http_referer ~ 'niki-mlt\.ru') {return 444;}
+if ($http_referer ~ 'novosti-hi-tech\.ru') {return 444;}
+if ($http_referer ~ 'nufaq\.com') {return 444;}
+if ($http_referer ~ 'online-hit\.info') {return 444;}
+if ($http_referer ~ 'online-templatestore\.com') {return 444;}
+if ($http_referer ~ 'onlinetvseries\.me') {return 444;}
+if ($http_referer ~ 'onlywoman\.org') {return 444;}
+if ($http_referer ~ 'o-o-11-o-o\.com') {return 444;}
+if ($http_referer ~ 'o-o-6-o-o\.com') {return 444;}
+if ($http_referer ~ 'o-o-6-o-o\.ru') {return 444;}
+if ($http_referer ~ 'o-o-8-o-o\.com') {return 444;}
+if ($http_referer ~ 'o-o-8-o-o\.ru') {return 444;}
+if ($http_referer ~ 'ooo-olni\.ru') {return 444;}
+if ($http_referer ~ 'ownshop\.cf') {return 444;}
+if ($http_referer ~ 'ozas\.net') {return 444;}
+if ($http_referer ~ 'palvira\.com\.ua') {return 444;}
+if ($http_referer ~ 'petrovka-online\.com') {return 444;}
+if ($http_referer ~ 'photokitchendesign\.com') {return 444;}
+if ($http_referer ~ 'pizza-imperia\.com') {return 444;}
+if ($http_referer ~ 'pizza-tycoon\.com') {return 444;}
+if ($http_referer ~ 'popads\.net') {return 444;}
+if ($http_referer ~ 'pops\.foundation') {return 444;}
+if ($http_referer ~ 'pornhub-forum\.ga') {return 444;}
+if ($http_referer ~ 'pornhub-forum\.uni\.me') {return 444;}
+if ($http_referer ~ 'pornhub-ru\.com') {return 444;}
+if ($http_referer ~ 'pornoforadult\.com') {return 444;}
+if ($http_referer ~ 'pornogig\.com') {return 444;}
+if ($http_referer ~ 'pornoklad\.ru') {return 444;}
+if ($http_referer ~ 'portnoff\.od\.ua') {return 444;}
+if ($http_referer ~ 'pozdravleniya-c\.ru') {return 444;}
+if ($http_referer ~ 'priceg\.com') {return 444;}
+if ($http_referer ~ 'pricheski-video\.com') {return 444;}
+if ($http_referer ~ 'prlog\.ru') {return 444;}
+if ($http_referer ~ 'producm\.ru') {return 444;}
+if ($http_referer ~ 'prodvigator\.ua') {return 444;}
+if ($http_referer ~ 'prointer\.net\.ua') {return 444;}
+if ($http_referer ~ 'promoforum\.ru') {return 444;}
+if ($http_referer ~ 'pron\.pro') {return 444;}
+if ($http_referer ~ 'psa48\.ru') {return 444;}
+if ($http_referer ~ 'qualitymarketzone\.com') {return 444;}
+if ($http_referer ~ 'quit-smoking\.ga') {return 444;}
+if ($http_referer ~ 'qwesa\.ru') {return 444;}
+if ($http_referer ~ 'rank-checker\.online') {return 444;}
+if ($http_referer ~ 'rankings-analytics\.com') {return 444;}
+if ($http_referer ~ 'ranksonic\.info') {return 444;}
+if ($http_referer ~ 'ranksonic\.net') {return 444;}
+if ($http_referer ~ 'ranksonic\.org') {return 444;}
+if ($http_referer ~ 'rapidgator-porn\.ga') {return 444;}
+if ($http_referer ~ 'rcb101\.ru') {return 444;}
+if ($http_referer ~ 'rednise\.com') {return 444;}
+if ($http_referer ~ 'replica-watch\.ru') {return 444;}
+if ($http_referer ~ 'research\.ifmo\.ru') {return 444;}
+if ($http_referer ~ 'resellerclub\.com') {return 444;}
+if ($http_referer ~ 'responsive-test\.net') {return 444;}
+if ($http_referer ~ 'reversing\.cc') {return 444;}
+if ($http_referer ~ 'rightenergysolutions\.com\.au') {return 444;}
+if ($http_referer ~ 'rospromtest\.ru') {return 444;}
+if ($http_referer ~ 'rumamba\.com') {return 444;}
+if ($http_referer ~ 'rusexy\.xyz') {return 444;}
+if ($http_referer ~ 'sad-torg\.com\.ua') {return 444;}
+if ($http_referer ~ 'sady-urala\.ru') {return 444;}
+if ($http_referer ~ 'sanjosestartups\.com') {return 444;}
+if ($http_referer ~ 'santasgift\.ml') {return 444;}
+if ($http_referer ~ 'savetubevideo\.com') {return 444;}
+if ($http_referer ~ 'savetubevideo\.info') {return 444;}
+if ($http_referer ~ 'screentoolkit\.com') {return 444;}
+if ($http_referer ~ 'scripted\.com') {return 444;}
+if ($http_referer ~ 'search-error\.com') {return 444;}
+if ($http_referer ~ 'semalt\.com') {return 444;}
+if ($http_referer ~ 'semaltmedia\.com') {return 444;}
+if ($http_referer ~ 'seo-2-0\.com') {return 444;}
+if ($http_referer ~ 'seoanalyses\.com') {return 444;}
+if ($http_referer ~ 'seoexperimenty\.ru') {return 444;}
+if ($http_referer ~ 'seo-platform\.com') {return 444;}
+if ($http_referer ~ 'seopub\.net') {return 444;}
+if ($http_referer ~ 'seo-smm\.kz') {return 444;}
+if ($http_referer ~ 'sexsaoy\.com') {return 444;}
+if ($http_referer ~ 'sexyali\.com') {return 444;}
+if ($http_referer ~ 'sexyteens\.hol\.es') {return 444;}
+if ($http_referer ~ 'sharebutton\.net') {return 444;}
+if ($http_referer ~ 'share-buttons\.xyz') {return 444;}
+if ($http_referer ~ 'sharebutton\.to') {return 444;}
+if ($http_referer ~ 'shop\.xz618\.com') {return 444;}
+if ($http_referer ~ 'sibecoprom\.ru') {return 444;}
+if ($http_referer ~ 'simple-share-buttons\.com') {return 444;}
+if ($http_referer ~ 'site5\.com') {return 444;}
+if ($http_referer ~ 'site-auditor\.online') {return 444;}
+if ($http_referer ~ 'siteripz\.net') {return 444;}
+if ($http_referer ~ 'sitevaluation\.org') {return 444;}
+if ($http_referer ~ 'sledstvie-veli\.net') {return 444;}
+if ($http_referer ~ 'slftsdybbg\.ru') {return 444;}
+if ($http_referer ~ 'slkrm\.ru') {return 444;}
+if ($http_referer ~ 'slow-website\.xyz') {return 444;}
+if ($http_referer ~ 'smailik\.org') {return 444;}
+if ($http_referer ~ 'smartphonediscount\.info') {return 444;}
+if ($http_referer ~ 'snip\.to') {return 444;}
+if ($http_referer ~ 'snip\.tw') {return 444;}
+if ($http_referer ~ 'soaksoak\.ru') {return 444;}
+if ($http_referer ~ 'social-buttons\.com') {return 444;}
+if ($http_referer ~ 'social-buttons-ii\.xyz') {return 444;}
+if ($http_referer ~ 'socialbuttons\.xyz') {return 444;}
+if ($http_referer ~ 'social-button\.xyz') {return 444;}
+if ($http_referer ~ 'socialseet\.ru') {return 444;}
+if ($http_referer ~ 'social-traffic-1\.xyz') {return 444;}
+if ($http_referer ~ 'social-traffic-2\.xyz') {return 444;}
+if ($http_referer ~ 'social-traffic-3\.xyz') {return 444;}
+if ($http_referer ~ 'social-traffic-4\.xyz') {return 444;}
+if ($http_referer ~ 'social-traffic-5\.xyz') {return 444;}
+if ($http_referer ~ 'social-traffic-7\.xyz') {return 444;}
+if ($http_referer ~ 'social-widget\.xyz') {return 444;}
+if ($http_referer ~ 'sohoindia\.net') {return 444;}
+if ($http_referer ~ 'solitaire-game\.ru') {return 444;}
+if ($http_referer ~ 'solnplast\.ru') {return 444;}
+if ($http_referer ~ 'sosdepotdebilan\.com') {return 444;}
+if ($http_referer ~ 'spin2016\.cf') {return 444;}
+if ($http_referer ~ 'spravka130\.ru') {return 444;}
+if ($http_referer ~ 'steame\.ru') {return 444;}
+if ($http_referer ~ 'success-seo\.com') {return 444;}
+if ($http_referer ~ 'superiends\.org') {return 444;}
+if ($http_referer ~ 'supervesti\.ru') {return 444;}
+if ($http_referer ~ 'taihouse\.ru') {return 444;}
+if ($http_referer ~ 'tattooha\.com') {return 444;}
+if ($http_referer ~ 'tedxrj\.com') {return 444;}
+if ($http_referer ~ 'theguardlan\.com') {return 444;}
+if ($http_referer ~ 'tomck\.com') {return 444;}
+if ($http_referer ~ 'top1-seo-service\.com') {return 444;}
+if ($http_referer ~ 'topquality\.cf') {return 444;}
+if ($http_referer ~ 'topseoservices\.co') {return 444;}
+if ($http_referer ~ 'traffic2cash\.org') {return 444;}
+if ($http_referer ~ 'traffic2cash\.xyz') {return 444;}
+if ($http_referer ~ 'traffic2money\.com') {return 444;}
+if ($http_referer ~ 'traffic-cash\.xyz') {return 444;}
+if ($http_referer ~ 'trafficgenius\.xyz') {return 444;}
+if ($http_referer ~ 'trafficmonetize\.org') {return 444;}
+if ($http_referer ~ 'trafficmonetizer\.org') {return 444;}
+if ($http_referer ~ 'trion\.od\.ua') {return 444;}
+if ($http_referer ~ 'uasb\.ru') {return 444;}
+if ($http_referer ~ 'unpredictable\.ga') {return 444;}
+if ($http_referer ~ 'uptimechecker\.com') {return 444;}
+if ($http_referer ~ 'uptime\.com') {return 444;}
+if ($http_referer ~ 'uzungil\.com') {return 444;}
+if ($http_referer ~ 'varikozdok\.ru') {return 444;}
+if ($http_referer ~ 'vesnatehno\.com') {return 444;}
+if ($http_referer ~ 'video--production\.com') {return 444;}
+if ($http_referer ~ 'videos-for-your-business\.com') {return 444;}
+if ($http_referer ~ 'video-woman\.com') {return 444;}
+if ($http_referer ~ 'viel\.su') {return 444;}
+if ($http_referer ~ 'viktoria-center\.ru') {return 444;}
+if ($http_referer ~ 'vodaodessa\.com') {return 444;}
+if ($http_referer ~ 'vodkoved\.ru') {return 444;}
+if ($http_referer ~ 'w3javascript\.com') {return 444;}
+if ($http_referer ~ 'wallpaperdesk\.info') {return 444;}
+if ($http_referer ~ 'webmaster-traffic\.com') {return 444;}
+if ($http_referer ~ 'webmonetizer\.net') {return 444;}
+if ($http_referer ~ 'web-revenue\.xyz') {return 444;}
+if ($http_referer ~ 'website-analyzer\.info') {return 444;}
+if ($http_referer ~ 'websites-reviews\.com') {return 444;}
+if ($http_referer ~ 'websocial\.me') {return 444;}
+if ($http_referer ~ 'wmasterlead\.com') {return 444;}
+if ($http_referer ~ 'woman-orgasm\.ru') {return 444;}
+if ($http_referer ~ 'wordpresscore\.com') {return 444;}
+if ($http_referer ~ 'wordpress-crew\.net') {return 444;}
+if ($http_referer ~ 'works\.if\.ua') {return 444;}
+if ($http_referer ~ 'ykecwqlixx\.ru') {return 444;}
+if ($http_referer ~ 'youporn-forum\.ga') {return 444;}
+if ($http_referer ~ 'youporn-forum\.uni\.me') {return 444;}
+if ($http_referer ~ 'youporn-ru\.com') {return 444;}
+if ($http_referer ~ 'yourserverisdown\.com') {return 444;}
+if ($http_referer ~ 'zastroyka\.org') {return 444;}
+if ($http_referer ~ 'zoominfo\.com') {return 444;}
+if ($http_referer ~ 'zvetki\.ru') {return 444;}
+#set $rule_id "";
+#the end
+

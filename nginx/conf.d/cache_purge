@@ -1,0 +1,8 @@
+#module:ngx_cache_purge
+location ~ /purge(/.*) {
+            allow           127.0.0.1;
+            allow           10.0.2.0/24;
+	    allow	    106.39.33.34;
+            deny            all;
+            proxy_cache_purge    proxy_cache $host$1$is_args$args;
+        }
