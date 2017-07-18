@@ -1,0 +1,6 @@
+# tables
+table <ids_blacklistin> persist
+table <ids_blacklistout> persist
+# filter rules
+block drop in quick log on vtnet1 from <ids_blacklistin> to any
+block drop in quick log on vtnet0 from any to <ids_blacklistout>
