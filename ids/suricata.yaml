@@ -50,7 +50,7 @@ vars:
 default-rule-path: /usr/local/etc/suricata/rules
 rule-files:
  - botcc.rules
- - botcc.portgrouped.rules
+# - botcc.portgrouped.rules
  - ciarmy.rules
  - compromised.rules
  - drop.rules
@@ -67,7 +67,7 @@ rule-files:
  - emerging-icmp_info.rules
  - emerging-icmp.rules
  - emerging-imap.rules
- - emerging-inappropriate.rules
+# - emerging-inappropriate.rules
 # - emerging-info.rules
  - emerging-malware.rules
  - emerging-misc.rules
@@ -95,7 +95,7 @@ rule-files:
  - emerging-worm.rules
  - tor.rules
 # - decoder-events.rules # available in suricata sources under rules dir
- - stream-events.rules  # available in suricata sources under rules dir
+# - stream-events.rules  # available in suricata sources under rules dir
  - http-events.rules    # available in suricata sources under rules dir
  - smtp-events.rules    # available in suricata sources under rules dir
  - dns-events.rules     # available in suricata sources under rules dir
