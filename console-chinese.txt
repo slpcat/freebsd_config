@@ -1,0 +1,9 @@
+1. 下载控制台中文字体，点击下载
+
+2. 复制字体到指定目录
+cp wqy.fnt /usr/share/vt/fonts/
+3. 进行系统设置
+sysrc font8x16="wqy"
+echo 'hw.vga.textmode=0' >> /boot/loader.conf
+echo 'kern.vty=vt' >> /boot/loader.conf
+vidfont 选择wqy字体
